@@ -8,6 +8,7 @@ class myExcelWriter():
     workbook = None
     sheet = None
     cur_row_num = 0
+    error = ''
 
     def __init__(self, file_path):
         self.workbook = xlsxwriter.Workbook(file_path, {'constant_memory': False})
@@ -15,6 +16,23 @@ class myExcelWriter():
     def new_sheet(self, title):
         self.sheet = self.workbook.add_worksheet(title)
         self.cur_row_num = 0
+    #end def
+
+    def import_from_data(self, data):
+        if not (data and isinstance(data, list)):
+            self.error = 'data is not a list'
+            return False
+        #end if
+        for sheet_data in data:
+            #print(sheet_data)
+            if 'name' not in sheet_data or 'rows' not in sheet_data:
+                self.error = 'name or rows not found in json'
+                return False
+            #end if
+            self.new_sheet(sheet_data['name'])
+            self.append_rows(sheet_data['rows'])
+        #end for
+        return self.save()
     #end def
 
     def append_row(self, row_data):
@@ -29,9 +47,16 @@ class myExcelWriter():
             col_data = row_data[i]
 
             format = None
-            if 'format' in col_data:
-                format = self.__parse_format(col_data['format'])
-            # end def
+            if 'format' not in col_data:
+                col_data['format'] = {
+                    'align': 'center',
+                    'valign': 'vcenter',
+                    'font_size':12
+                }
+            #end if
+
+            format = self.__parse_format(col_data['format'])
+
 
             if not col_data:
                 col_data = {'value':''}
@@ -39,6 +64,7 @@ class myExcelWriter():
             if 'value' not in col_data:
                 col_data['value'] = ''
             #end if
+
             if 'data_type' not in col_data:
                 col_data['data_type'] = 'default'
             #end def
@@ -79,6 +105,12 @@ class myExcelWriter():
         #{'constant_memory': True}
         param = data['data_type_param'] if 'data_type_param' in data else "";
         param = data['value'] if param=="" else param;
+        if format is None:
+             format = self.workbook.get_default_url_format()
+        #end def
+        format.set_underline(0)
+        format.set_font_color('#000000')
+
         self.sheet.write_url(row, col, param, format, data['value'])
     #end def
 
@@ -99,9 +131,14 @@ class myExcelWriter():
     #end def
 
     def save(self):
-        self.workbook.close()
+        try:
+            self.workbook.close()
+            return True
+        except Exception as ex:
+            self.error = str(ex)
+            return False
+        #end try
     # end def
-
 
     def set_range_format(self, row, col, format):
         format = self.__parse_format(format)
